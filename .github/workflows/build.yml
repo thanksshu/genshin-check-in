@@ -1,0 +1,30 @@
+name: build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --release --verbose
+
+    - run: chmod 777 target/release/genshin_check_in
+    - run: mv target/release/genshin_check_in target/release/bootstrap
+    - run: ls -l target/release/
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: code
+        path: target/release/bootstrap
