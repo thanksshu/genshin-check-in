@@ -1,4 +1,4 @@
-use log::{error, info, warn};
+use log::{info, warn};
 use reqwest::{cookie::Jar, ClientBuilder, Url};
 use serde::{Deserialize, Serialize};
 use std::{env, sync::Arc};
@@ -16,20 +16,11 @@ async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
         retcode: i16,
     }
 
-    let url = URL.parse::<Url>().unwrap_or_else(|err| {
-        error!("Check in url parsing error: {:?}", err);
-        panic!("Exiting...");
-    });
+    let url = URL.parse::<Url>()?; // parse check in url
 
     /* bake cookies */
-    let ltuid = env::var("LTUID").unwrap_or_else(|err| {
-        error!("LTUID setting error: {:?}", err);
-        "0".to_string()
-    });
-    let ltoken = env::var("LTOKEN").unwrap_or_else(|err| {
-        error!("LTOKEN setting error: {:?}", err);
-        "0".to_string()
-    });
+    let ltuid = env::var("LTUID")?;
+    let ltoken = env::var("LTOKEN")?;
 
     let cookies = [
         format!("ltoken={}; Domain=.mihoyo.com;", ltoken),
@@ -46,11 +37,7 @@ async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
     let client = ClientBuilder::new()
         .user_agent(UA)
         .cookie_provider(jar.clone())
-        .build()
-        .unwrap_or_else(|err| {
-            error!("Client build error: {:?}", err);
-            panic!("Exiting...")
-        });
+        .build()?;
 
     /* post request */
     let result = client
@@ -58,27 +45,24 @@ async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
         .send()
         .await?
         .json::<Response>()
-        .await
-        .unwrap_or_else(|err| {
-            error!("Json paring error: {:?}", err);
-            panic!("Exiting...");
-        });
+        .await?;
 
     /* verify response */
     match result {
         Response {
             message,
             retcode: i,
-        } if i == 0 => Ok(message),
+        } if i == 0 || i == -5003 => Ok(message),
         Response { message, retcode } => Err(format!("{} {}", retcode, message).into()),
     }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> () {
+    /* init logger */
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
-    /*  POST /invoke */
+    /*  app for POST /invoke */
     let app = warp::path!("invoke").and(warp::post()).then(|| async {
         match check_in().await {
             Ok(m) => {
@@ -88,10 +72,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .header("x-fc-status", "200")
                     .status(200)
                     .body(m)
-                    .unwrap_or_else(|err| {
-                        error!("Ok response building error: {:?}", err);
-                        panic!("Exiting...");
-                    })
             }
 
             Err(m) => {
@@ -101,15 +81,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .header("x-fc-status", "404")
                     .status(404)
                     .body(message)
-                    .unwrap_or_else(|err| {
-                        error!("Err response building error: {:?}", err);
-                        panic!("Exiting...");
-                    })
             }
         }
     });
 
     warp::serve(app).run(([0, 0, 0, 0], 9000)).await;
-
-    Ok(())
 }
