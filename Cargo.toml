@@ -1,6 +1,6 @@
 [package]
 name = "genshin_check_in"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,8 +9,10 @@ edition = "2021"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", features = ["json", "cookies"] }
 serde = { version = "1.0", features = ["derive"] }
-openssl = { version = "0.10", features = ["vendored"] }
 serde_json = "1.0"
 warp = "0.3"
 log = "0.4"
 simple_logger = "2"
+
+[target.x86_64-unknown-linux-musl.dependencies]
+openssl = { version = "0.10", features=["vendored"] }

@@ -13,7 +13,7 @@ async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
     #[derive(Serialize, Deserialize, Debug)]
     struct Response {
         message: String,
-        retcode: i16,
+        retcode: i32,
     }
 
     let url = URL.parse::<Url>()?; // parse check in url
