@@ -1,21 +1,20 @@
-use log::{info, warn};
+use log::{info, error};
 use reqwest::{cookie::Jar, ClientBuilder, Url};
 use serde::{Deserialize, Serialize};
 use std::{env, sync::Arc};
-use tokio;
 use warp::{http::Response, Filter};
 
-const URL: &'static str = "https://hk4e-api-os.mihoyo.com/event/sol/sign?act_id=e202102251931481";
-const UA: &'static str =
+const URL: &str = "https://hk4e-api-os.mihoyo.com/event/sol/sign?act_id=e202102251931481";
+const UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/100.0";
 
-async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
-    #[derive(Serialize, Deserialize, Debug)]
-    struct Response {
-        message: String,
-        retcode: i32,
-    }
+#[derive(Serialize, Deserialize, Debug)]
+struct CheckInResponse {
+    message: String,
+    retcode: i32,
+}
 
+async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
     let url = URL.parse::<Url>()?; // parse check in url
 
     /* bake cookies */
@@ -44,21 +43,21 @@ async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
         .post(url.clone())
         .send()
         .await?
-        .json::<Response>()
+        .json::<CheckInResponse>()
         .await?;
 
     /* verify response */
     match result {
-        Response {
+        CheckInResponse {
             message,
             retcode: i,
         } if i == 0 || i == -5003 => Ok(message),
-        Response { message, retcode } => Err(format!("{} {}", retcode, message).into()),
+        CheckInResponse { message, retcode } => Err(format!("{} {}", retcode, message).into()),
     }
 }
 
 #[tokio::main]
-async fn main() -> () {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /* init logger */
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
@@ -66,7 +65,7 @@ async fn main() -> () {
     let app = warp::path!("invoke").and(warp::post()).then(|| async {
         match check_in().await {
             Ok(m) => {
-                let message = format!("{}", m);
+                let message = m.to_string();
                 info!("{}", message);
                 Response::builder()
                     .header("x-fc-status", "200")
@@ -75,8 +74,8 @@ async fn main() -> () {
             }
 
             Err(m) => {
-                let message = format!("{:?}", m);
-                warn!("{}", message);
+                let message = format!("{}", m);
+                error!("{}", message);
                 Response::builder()
                     .header("x-fc-status", "404")
                     .status(404)
@@ -86,4 +85,5 @@ async fn main() -> () {
     });
 
     warp::serve(app).run(([0, 0, 0, 0], 9000)).await;
+    Ok(())
 }
