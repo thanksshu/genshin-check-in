@@ -1,14 +1,13 @@
-use log::{info, error};
+use actix_web::{post, App, HttpResponse, HttpServer, Responder};
+use log::{error, info};
 use reqwest::{cookie::Jar, ClientBuilder, Url};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use std::{env, sync::Arc};
-use warp::{http::Response, Filter};
 
 const URL: &str = "https://hk4e-api-os.mihoyo.com/event/sol/sign?act_id=e202102251931481";
-const UA: &str =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/100.0";
+const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/100.0";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 struct CheckInResponse {
     message: String,
     retcode: i32,
@@ -40,7 +39,7 @@ async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
 
     /* post request */
     let result = client
-        .post(url.clone())
+        .post(url)
         .send()
         .await?
         .json::<CheckInResponse>()
@@ -56,34 +55,36 @@ async fn check_in() -> Result<String, Box<dyn std::error::Error>> {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/*  app for POST /invoke */
+#[post("/invoke")]
+async fn invoke() -> impl Responder {
+    match check_in().await {
+        Ok(m) => {
+            let message = m.to_string();
+            info!("{}", message);
+            HttpResponse::Ok()
+                .insert_header(("x-fc-status", "200"))
+                .body(m)
+        }
+
+        Err(e) => {
+            let message = format!("{}", e);
+            error!("{}", message);
+            HttpResponse::NotFound()
+                .insert_header(("x-fc-status", "404"))
+                .body(message)
+        }
+    }
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     /* init logger */
     simple_logger::SimpleLogger::new().env().init().unwrap();
 
-    /*  app for POST /invoke */
-    let app = warp::path!("invoke").and(warp::post()).then(|| async {
-        match check_in().await {
-            Ok(m) => {
-                let message = m.to_string();
-                info!("{}", message);
-                Response::builder()
-                    .header("x-fc-status", "200")
-                    .status(200)
-                    .body(m)
-            }
-
-            Err(m) => {
-                let message = format!("{}", m);
-                error!("{}", message);
-                Response::builder()
-                    .header("x-fc-status", "404")
-                    .status(404)
-                    .body(message)
-            }
-        }
-    });
-
-    warp::serve(app).run(([0, 0, 0, 0], 9000)).await;
-    Ok(())
+    /* start server */
+    HttpServer::new(|| App::new().service(invoke))
+        .bind(("0.0.0.0", 9000))?
+        .run()
+        .await
 }
