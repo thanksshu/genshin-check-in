@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# FOR ALIIYUN FC PYTHON3.7 RUN TIME
+# FOR ALIIYUN FC PYTHON 3.6 RUNTIME
 import logging
 import os
 import time
@@ -22,7 +22,7 @@ def handler(_event, _context):
     jar.set('ltoken', ltoken, domain='.mihoyo.com')
     
     # post request
-    time.sleep(floor(random() * 3000)) # random waiting
+    # time.sleep(floor(random() * 3000)) # random waiting
     r = requests.post(URL, cookies=jar)
 
     # verify response
