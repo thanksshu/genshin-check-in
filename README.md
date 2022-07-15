@@ -55,7 +55,7 @@
 
     ![编辑函数代码](img/edit_function.png)
 
-9. 将 [server.py](https://github.com/thanksshu/genshin-check-in/blob/main/server.py) 中的代码覆盖进去，并点击“部署代码”，并等候部署完毕
+9. 将 [server.py](https://github.com/thanksshu/genshin-check-in/blob/main/index.py) 中的代码覆盖进去，并点击“部署代码”，并等候部署完毕
 
     ![部署成功](img/deployment_complete.png)
 
