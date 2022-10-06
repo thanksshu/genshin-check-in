@@ -1,7 +1,7 @@
 use actix_web::{post, App, HttpResponse, HttpServer, Responder};
 use log::{error, info};
 use reqwest::{cookie::Jar, ClientBuilder, Url};
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::{env, sync::Arc};
 
 const URL: &str = "https://hk4e-api-os.mihoyo.com/event/sol/sign?act_id=e202102251931481";
