@@ -1,20 +1,16 @@
 [package]
 name = "genshin_check_in"
-version = "0.2.0"
+version = "1.2.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-actix-web = "4"
-reqwest = { version = "0.11", features = ["json", "cookies"] }
+ureq = { version = "2", features = ["json", "cookies"] }
+cookie_store = "0.16"
+url = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4"
-simple_logger = "2"
-
-[target.x86_64-unknown-linux-musl.dependencies]
-openssl = { version = "0.10", features=["vendored"] }
+simple_logger = "4"
 
 [profile.release]
 lto = "fat"
