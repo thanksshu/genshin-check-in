@@ -15,9 +15,9 @@ jobs:
 
       - name: Prepare musl
         run: |
-          git clone --depth 1 git://git.musl-libc.org/musl
-          git switch --detach $MUSL_VERSION
+          git clone git://git.musl-libc.org/musl
           cd musl
+          git switch --detach $MUSL_VERSION
           ./configure && sudo make install
 
       - name: Init rust compiler
