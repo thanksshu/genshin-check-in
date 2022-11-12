@@ -12,6 +12,7 @@ use std::{
 };
 use thiserror::Error;
 use tracing::{error, info, warn};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 const URL_STRING: &str = "https://hk4e-api-os.mihoyo.com/event/sol/sign?act_id=e202102251931481";
 const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0";
@@ -142,7 +143,14 @@ fn main() {
     URL.set(URL_STRING.parse::<Url>().unwrap()).unwrap();
 
     /* init logger */
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(EnvFilter::from_default_env())
+        .init();
+
+    info!("test info");
+    error!("test error");
+    warn!("test warn");
 
     /* start server */
     let listener = TcpListener::bind("0.0.0.0:9000").unwrap();
