@@ -10,12 +10,12 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use thiserror::Error;
 use tracing::{error, info, warn};
 
 const URL_STRING: &str = "https://hk4e-api-os.mihoyo.com/event/sol/sign?act_id=e202102251931481";
 const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0";
-const RETRY_TIME: u64 = 5;
-const RETRY_INTERVAL: u64 = 1000; // ms
+const RETRY_INTERVAL: [u64; 5] = [500, 1000, 2000, 4000, 8000]; // ms
 
 static URL: OnceCell<Url> = OnceCell::new();
 static LTUID: OnceCell<String> = OnceCell::new();
@@ -27,7 +27,19 @@ struct CheckInResponse {
     retcode: i32,
 }
 
-fn check_in() -> Result<CheckInResponse, reqwest::Error> {
+#[derive(Error, Debug)]
+enum CheckInError {
+    #[error("LTOKEN or LTUID incorrect")]
+    NotLogIn,
+    #[error("temporarily unable to check in")]
+    RetryLater,
+    #[error(transparent)]
+    RequestFailure(#[from] reqwest::Error),
+    #[error("unknow check in failure with {:?}", .0)]
+    Unknown(CheckInResponse),
+}
+
+fn check_in() -> Result<String, CheckInError> {
     /* bake cookies */
     let cookies = [
         format!("ltoken={}; Domain=.mihoyo.com;", LTOKEN.get().unwrap()),
@@ -48,56 +60,60 @@ fn check_in() -> Result<CheckInResponse, reqwest::Error> {
         .unwrap();
 
     /* post request */
-    Ok(client
+    let result = client
         .post(URL_STRING)
         .send()?
+        // .map_err(|err| CheckInError::SendFailure(err))?
         .json::<CheckInResponse>()
-        .unwrap())
+        .unwrap();
+
+    match result.retcode {
+        0 | -5003 => Ok(format!(
+            "succeed with {} {}",
+            result.retcode, result.message
+        )),
+        -100 => Err(CheckInError::NotLogIn),
+        50000 => Err(CheckInError::RetryLater),
+        _ => Err(CheckInError::Unknown(result)),
+    }
+}
+
+fn reply_404(stream: &mut TcpStream) {
+    stream
+        .write_all("HTTP/1.1 404 Not Found\r\nX-Fc-Status: 404\r\n\r\n".as_bytes())
+        .unwrap()
 }
 
 fn handle_invoke(stream: &mut TcpStream) {
-    let mut rely_404 = |error_message: &String| {
-        stream
-            .write_all(
-                format!(
-                    "HTTP/1.1 404 Not Found\r\nX-Fc-Status: 404\r\n\r\n{}",
-                    error_message
-                )
-                .as_bytes(),
-            )
-            .unwrap();
-    };
-
-    for try_time in 1..=RETRY_TIME {
-        let wait_time = Duration::from_millis(try_time * RETRY_INTERVAL);
+    for (try_time, wait_time) in RETRY_INTERVAL
+        .into_iter()
+        .map(Duration::from_millis)
+        .enumerate()
+    {
         match check_in() {
-            Ok(CheckInResponse { message, retcode }) => {
-                if retcode == 0 || retcode == -5003 {
-                    stream
-                        .write_all(
-                            format!(
-                                "HTTP/1.1 200 OK\r\nX-Fc-Status: 200\r\n\r\n{retcode} {message}"
-                            )
+            Ok(success_message) => {
+                stream
+                    .write_all(
+                        format!("HTTP/1.1 200 OK\r\nX-Fc-Status: 200\r\n\r\n{success_message}")
                             .as_bytes(),
-                        )
-                        .unwrap();
-                    info!("check in succeed or already checked in");
-                    break;
-                } else {
-                    warn!("check in failed, retrying in {:#?}", wait_time);
-                    sleep(wait_time);
-                    if try_time == 5 {
-                        rely_404(&format!("{retcode} {message}"));
-                        error!("all check in retry failed");
-                    }
-                    continue;
-                }
+                    )
+                    .unwrap();
+                info!("check in succeed or already checked in");
+                break;
             }
-            Err(error) => {
-                warn!("check in failed, retrying in {:#?}", wait_time);
+            Err(err @ CheckInError::NotLogIn) => {
+                reply_404(stream);
+                error!("{}", err);
+                break;
+            }
+            Err(err) => {
+                warn!(
+                    "check in failed with {:?}, retrying in {:#?}",
+                    err, wait_time
+                );
                 sleep(wait_time);
                 if try_time == 5 {
-                    rely_404(&format!("{error}"));
+                    reply_404(stream);
                     error!("all check in retry failed");
                 }
                 continue;
