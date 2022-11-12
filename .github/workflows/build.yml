@@ -1,7 +1,6 @@
 name: build
 
-on:
-  [workflow_dispatch, push]
+on: [workflow_dispatch, push]
 
 env:
   CARGO_TERM_COLOR: always
@@ -11,30 +10,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Prepare musl
-      run: |
-        git clone --depth 1 git://git.musl-libc.org/musl
-        cd musl
-        ./configure && sudo make install
+      - uses: actions/checkout@v3
 
-    - name: Add target
-      run: rustup target add x86_64-unknown-linux-musl
+      - name: Prepare musl
+        run: |
+          git clone --depth 1 git://git.musl-libc.org/musl
+          cd musl
+          ./configure && sudo make install
 
-    - name: Build
-      run: |
-        PATH="/usr/local/musl/bin:$PATH" cargo b -r --target x86_64-unknown-linux-musl
-    
-    - name: Post build process
-      run: |
-        chmod 755 target/x86_64-unknown-linux-musl/release/genshin_check_in
-        cp target/x86_64-unknown-linux-musl/release/genshin_check_in server
-        ls -l
+      - name: Init rust compiler
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add x86_64-unknown-linux-musl
 
-    - name: Upload
-      uses: actions/upload-artifact@v3
-      with:
-        name: genshin_check_in
-        path: |
-          server
-          index.py
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: |
+          PATH="/usr/local/musl/bin:$PATH" cargo b -r --target x86_64-unknown-linux-musl
+
+      - name: Post build process
+        run: |
+          chmod 755 target/x86_64-unknown-linux-musl/release/genshin_check_in
+          cp target/x86_64-unknown-linux-musl/release/genshin_check_in server
+          ls -l
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: genshin_check_in
+          path: |
+            server
+            index.py
