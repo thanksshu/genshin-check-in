@@ -64,7 +64,6 @@ fn check_in() -> Result<String, CheckInError> {
     let result = client
         .post(URL_STRING)
         .send()?
-        // .map_err(|err| CheckInError::SendFailure(err))?
         .json::<CheckInResponse>()
         .unwrap();
 
@@ -147,10 +146,6 @@ fn main() {
         .with(tracing_subscriber::fmt::layer())
         .with(EnvFilter::from_default_env())
         .init();
-
-    info!("test info");
-    error!("test error");
-    warn!("test warn");
 
     /* start server */
     let listener = TcpListener::bind("0.0.0.0:9000").unwrap();
