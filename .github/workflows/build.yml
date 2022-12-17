@@ -4,7 +4,6 @@ on: [workflow_dispatch, push]
 
 env:
   CARGO_TERM_COLOR: always
-  MUSL_VERSION: v1.2.3
 
 jobs:
   build:
@@ -13,30 +12,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Prepare musl
-        run: |
-          git clone git://git.musl-libc.org/musl
-          cd musl
-          git switch --detach $MUSL_VERSION
-          ./configure && sudo make install
-
       - name: Init rust compiler
         run: |
           rustup toolchain install stable --profile minimal
-          rustup target add x86_64-unknown-linux-musl
+          rustup target add x86_64-unknown-linux-gnu
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Build
         run: |
           cargo update
-          PATH="/usr/local/musl/bin:$PATH" cargo b -r --target x86_64-unknown-linux-musl
+          RUSTFLAGS='-C target-feature=+crt-static' cargo b -r --target x86_64-unknown-linux-gnu
 
       - name: Post build process
         run: |
-          chmod 755 target/x86_64-unknown-linux-musl/release/genshin_check_in
-          cp target/x86_64-unknown-linux-musl/release/genshin_check_in server
-          ls -l
+          chmod 755 target/x86_64-unknown-linux-gnu/release/genshin_check_in
+          cp target/x86_64-unknown-linux-gnu/release/genshin_check_in server
+          ls -lh
 
       - name: Upload
         uses: actions/upload-artifact@v3
